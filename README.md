@@ -1,3 +1,5 @@
+<img src=".claude-plugin/icon.png" alt="Prompt Master icon" width="128" align="right">
+
 # Prompt Master
 
 A Claude Code mod that turns your rough prompt into a clearer, sharper one before you send it.
