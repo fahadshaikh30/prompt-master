@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href=".claude-plugin/plugin.json"><img alt="Version" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffahadshaikh30%2Fprompt-master%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&prefix=v&label=version&color=7c3aed"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/fahadshaikh30/prompt-master?color=d97757"></a>
 </p>
 
 Type a quick, messy prompt, click **✨ Prompt Master** above the prompt box, and the draft is replaced with a rewritten version: same intent and scope, but with a clear goal, the context you gave, constraints, and what "done" looks like. It fixes spelling and grammar and never invents requirements. Nothing is sent automatically — review it, tweak it, then press Enter.
