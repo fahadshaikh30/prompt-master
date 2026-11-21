@@ -9,6 +9,28 @@ const previous = atom({ plugin: 'prompt-master', key: 'previous' } as const, nul
 
 const MODEL = 'haiku'
 
+// The mod's icon (.claude-plugin/icon.png) as a small SVG: a rounded square with
+// a violet-to-orange gradient and three four-point sparkles.
+function sparkle(cx: number, cy: number, r: number): string {
+  const points: string[] = []
+  for (let k = 0; k < 8; k++) {
+    const a = Math.PI / 2 + (k * Math.PI) / 4
+    const rr = k % 2 === 0 ? r : r * 0.18
+    points.push(`${(cx + rr * Math.cos(a)).toFixed(2)},${(cy - rr * Math.sin(a)).toFixed(2)}`)
+  }
+  return `<polygon points="${points.join(' ')}"/>`
+}
+
+const ICON_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+  '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">' +
+  '<stop offset="0" stop-color="#7c3aed"/><stop offset="1" stop-color="#d97757"/>' +
+  '</linearGradient></defs>' +
+  '<rect width="100" height="100" rx="22" fill="url(#g)"/>' +
+  `<g fill="#ffffff">${sparkle(46, 54, 34)}</g>` +
+  `<g fill="#fff8e6">${sparkle(76, 25, 12)}${sparkle(78, 74, 7)}</g>` +
+  '</svg>'
+
 const SYSTEM = `You are Prompt Master. You rewrite a user's rough prompt for an AI coding/assistant agent (Claude) into a better prompt they will send in its place.
 
 Rules:
@@ -83,7 +105,11 @@ export const register: Register = on => {
     if (e.props.hasSurvey) {
       return next(e)
     }
-    const { Box, Button, Text } = $.ui.resolve(e)
+    const ui = $.ui.resolve(e)
+    const { Box, Button, Text } = ui
+    // Surfaces that draw SVG show the real icon; the terminal keeps the ✨.
+    const icon = 'Svg' in ui ? <ui.Svg source={ICON_SVG} alt="Prompt Master icon" width={18} height={18} /> : null
+    const sparkleLabel = icon ? '' : '✨ '
     const isWorking = (await read($, status)) === 'working'
     const before = await read($, previous)
 
@@ -102,16 +128,15 @@ export const register: Register = on => {
     }
 
     return (
-      <Box>
+      <Box flexDirection="row" alignItems="center" gap={1}>
+        {icon}
         {isWorking ? (
-          <Text dimColor>✨ Prompt Master is rewriting your prompt…</Text>
+          <Text dimColor>{sparkleLabel}Prompt Master is rewriting your prompt…</Text>
         ) : (
-          <Button key="master" label="✨ Prompt Master" hotkey="p" onPress={master} />
+          <Button key="master" label={`${sparkleLabel}Prompt Master`} hotkey="p" onPress={master} />
         )}
         {!isWorking && before !== null ? (
-          <Box marginLeft={1}>
-            <Button key="undo" label="Undo rewrite" dimColor onPress={undo} />
-          </Box>
+          <Button key="undo" label="Undo rewrite" dimColor onPress={undo} />
         ) : null}
       </Box>
     )
