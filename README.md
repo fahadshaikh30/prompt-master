@@ -1,8 +1,10 @@
-<img src=".claude-plugin/icon.png" alt="Prompt Master icon" width="128" align="right">
+<p align="center">
+  <img src=".claude-plugin/icon.png" alt="Prompt Master icon" width="112">
+</p>
 
-# Prompt Master
+<h1 align="center">Prompt Master</h1>
 
-A Claude Code mod that turns your rough prompt into a clearer, sharper one before you send it.
+<p align="center">A Claude Code mod that turns your rough prompt into a clearer, sharper one before you send it.</p>
 
 Type a quick, messy prompt, click **✨ Prompt Master** above the prompt box, and the draft is replaced with a rewritten version: same intent and scope, but with a clear goal, the context you gave, constraints, and what "done" looks like. It fixes spelling and grammar and never invents requirements. Nothing is sent automatically — review it, tweak it, then press Enter.
 
