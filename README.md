@@ -16,6 +16,7 @@ Type a quick, messy prompt, click **✨ Prompt Master** above the prompt box, an
 ## Features
 
 - **Prompt Master** button above the prompt box, with the mod's icon beside it in the desktop app, VS Code and mobile (✨ in the terminal); hotkey `p` when the band has focus
+- **Press again after editing**: add or change something in the improved prompt and press Prompt Master again, and it polishes just your edit and works it into the right place, keeping the rest
 - **Undo rewrite** button to restore your original draft
 - `/prompt-master [rough prompt]` slash command — the rewrite lands in your prompt box
 - Uses Claude Haiku for fast, cheap rewrites (each rewrite is one small model call on your account)

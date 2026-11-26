@@ -6,6 +6,11 @@ import type { Status } from '../types'
 const status = atom({ plugin: 'prompt-master', key: 'status' } as const, 'idle' as Status)
 // The draft before the last rewrite, so one click can put it back.
 const previous = atom({ plugin: 'prompt-master', key: 'previous' } as const, null as string | null)
+// The prompt as the last rewrite left it, so a second press can tell what the
+// user added since and work just that in.
+const lastRewrite = atom({ plugin: 'prompt-master', key: 'lastRewrite' } as const, null as string | null)
+// lastRewrite as it was before the latest rewrite, for Undo to restore.
+const priorRewrite = atom({ plugin: 'prompt-master', key: 'priorRewrite' } as const, null as string | null)
 
 const MODEL = 'haiku'
 
@@ -42,13 +47,56 @@ Rules:
 - Write it in the first person, as the user speaking to Claude.
 - Output ONLY the rewritten prompt. No preamble, no quotes, no explanation.`
 
+const REFINE_RULES = `
+This time the prompt was already improved once, and the user then edited it.
+You get the whole current prompt and, separately, exactly what the user added or changed.
+- Treat the new text as rough input: rewrite it to the same standard as the rest.
+- Move it to where it belongs in the prompt's structure (the goal, the context, a constraint, a bullet), merging with what is there instead of tacking it on at the end.
+- If it changes or contradicts something already in the prompt, the new text wins.
+- Keep the rest of the prompt as it is, apart from what is needed to fit the new text in.
+- Output ONLY the full updated prompt.`
+
 type Rewrite = { text: string } | { error: string }
 
-async function rewrite($: EngineInterface, rough: string): Promise<Rewrite> {
+// What the user changed in the last rewrite before pressing again: the one span
+// that differs between the two, found by trimming what they share at each end.
+export type Edit = { added: string; removed: string }
+
+export function findEdit(lastRewrite: string, draft: string): Edit | null {
+  if (!lastRewrite.trim()) return null
+  let start = 0
+  const max = Math.min(lastRewrite.length, draft.length)
+  while (start < max && lastRewrite[start] === draft[start]) start++
+  let end = 0
+  while (
+    end < max - start &&
+    lastRewrite[lastRewrite.length - 1 - end] === draft[draft.length - 1 - end]
+  ) {
+    end++
+  }
+  // Mostly rewritten or replaced: not an edit of the last rewrite.
+  if (start + end < lastRewrite.length * 0.5) return null
+  const added = draft.slice(start, draft.length - end).trim()
+  const removed = lastRewrite.slice(start, lastRewrite.length - end).trim()
+  return added || removed ? { added, removed } : null
+}
+
+export function buildRequest(draft: string, edit: Edit | null): { system: string; prompt: string } {
+  if (!edit) {
+    return { system: SYSTEM, prompt: `Rough prompt:\n<rough>\n${draft}\n</rough>` }
+  }
+  const parts = [`Current prompt (already improved once, then edited by the user):\n<prompt>\n${draft}\n</prompt>`]
+  if (edit.added) parts.push(`What the user added or rewrote:\n<added>\n${edit.added}\n</added>`)
+  if (edit.removed) parts.push(`What the user deleted or replaced:\n<removed>\n${edit.removed}\n</removed>`)
+  return { system: SYSTEM + '\n' + REFINE_RULES, prompt: parts.join('\n\n') }
+}
+
+async function rewrite($: EngineInterface, draft: string, edit: Edit | null): Promise<Rewrite> {
+  const { system, prompt } = buildRequest(draft, edit)
   const r = await $.model.complete({
     model: MODEL,
-    system: SYSTEM,
-    prompt: `Rough prompt:\n<rough>\n${rough}\n</rough>`,
+    system,
+    prompt,
     maxTokens: 2000,
     effort: 'low',
     timeoutMs: 60000,
@@ -67,10 +115,15 @@ async function run($: EngineInterface, rough: string): Promise<string> {
   if ((await read($, status)) === 'working') {
     return 'Prompt Master is already working.'
   }
+  const last = await read($, lastRewrite)
+  if (last !== null && rough.trim() === last.trim()) {
+    return 'This prompt is already improved. Add or change something, then press Prompt Master again.'
+  }
+  const edit = last === null ? null : findEdit(last, rough)
   await update($, status, () => 'working' as Status)
-  $.ui.status('Prompt Master: rewriting…')
+  $.ui.status(edit ? 'Prompt Master: working in your changes…' : 'Prompt Master: rewriting…')
   try {
-    const out = await rewrite($, rough)
+    const out = await rewrite($, rough, edit)
     if ('error' in out) {
       return `Prompt Master couldn't rewrite it (${out.error}).`
     }
@@ -79,7 +132,12 @@ async function run($: EngineInterface, rough: string): Promise<string> {
       return 'Prompt Master: the prompt box is busy; close any dialog and try again.'
     }
     await update($, previous, () => rough)
-    return 'Prompt rewritten. Review it, then press Enter to send.'
+    await update($, priorRewrite, () => last)
+    // The model's text, not filled.text: the box may report '' to a plugin.
+    await update($, lastRewrite, () => out.text)
+    return edit
+      ? 'Your changes are worked in. Review the prompt, then press Enter to send.'
+      : 'Prompt rewritten. Review it, then press Enter to send.'
   } finally {
     await update($, status, () => 'idle' as Status)
     $.ui.status(undefined)
@@ -87,6 +145,14 @@ async function run($: EngineInterface, rough: string): Promise<string> {
 }
 
 export const register: Register = on => {
+  // A sent prompt is done with: the next one starts fresh, with nothing to undo.
+  on('prompt.submit', async ($, e, next) => {
+    await update($, lastRewrite, () => null)
+    await update($, priorRewrite, () => null)
+    await update($, previous, () => null)
+    return next(e)
+  })
+
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'prompt-master',
@@ -123,6 +189,10 @@ export const register: Register = on => {
       const filled = await $.prompt.fill({ text: before, mode: 'replace' })
       if (filled.isFilled) {
         await update($, previous, () => null)
+        // Back to before that rewrite, so the next press compares against it.
+        const prior = await read($, priorRewrite)
+        await update($, lastRewrite, () => prior)
+        await update($, priorRewrite, () => null)
         $.ui.toast('Your original prompt is back.')
       }
     }
